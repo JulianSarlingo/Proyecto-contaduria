@@ -1,0 +1,50 @@
+------------
+HERRAMIENTA PARA BAJAR MIS COMPROBANTES AFIP
+------------
+
+El sistema permite la descarga de archivos desde "Mis Comprobantes" AFIP, para uno o varios contribuyentes en simultáneo, permitiendo configurar "tipo de comprobante" (Emitidos y/o Recibidos), "formato de descarga" (XLS o CSV) y "períodos a descagar" (Mes Anterior, Otro Período o Varios Períodos Simultáneos).
+
+A continuación se explica cómo utilizar la herramienta, la cual consta de 2 archivos XLS donde se ingresan los datos que utilizará el sistema, un archivo ejecutable .EXE y una carpeta CONFIG (que contiene archivos que no necesitan ser utilizados ni modificados).
+
+(Requerimientos del sistema: Windows 10 y Explorar Google Chrome)
+
+------------
+PASO A PASO: CÓMO COMPLETAR "MODELO_LISTA.XLS"
+------------
+
+Este es el archivo donde se detallarán los datos para que el sistema pueda ingresar a los distintos contribuyentes y realizar las descargas.
+
+Deberás completar la columna Nro. (con un número unívoco, que puede ser cualquier valor. Por ejemplo, un número correlativo del 1 en adelante, o incluso el número de CUIT del contribuyente - lo que resulta recomendable -).
+
+Opcionalmente podrá completarse la columna "Cliente" con el nombre del contribuyente (esto es simplemente para su propio control, no es obligatorio, el sistema no utiliza este dato).
+
+Finalmente, deberá completar obligatoriamente: CUIT (11 dígitos sin guiones) y CLAVE (con la clave fiscal AFIP de cada caso).
+
+La columna "PROCESADO COMPROBANTES (X)" se autocompletará con una X cuando el caso haya sido procesado y la descarga se haya realizado correctamente. 
+
+En caso de que la celda quede vacía (sin la X) significa que no pudo procesarse el caso (por ejemplo: porque el contribuyente tiene mal la clave fiscal, o tal vez porque no tiene habilitado el servicio "Mis Comprobantes" en su perfil de AFIP).
+
+Las columnas TOTAL COMP EMITIDOS y TOTAL COMP RECIBIDOS mostrarán la suma de todos los Emitidos y Recibidos que se han descargado.
+
+
+------------
+PASO A PASO: CÓMO USAR EL SISTEMA Y DESCARGAR LOS ARCHIVOS
+------------
+
+Ejecute el archivo "Bajar Mis Comprobantes.exe" y una vez dentro del sistema elija la configuración deseada:
+
+- Esperar que arranque el programa. La pantalla negra puede minimizarse.
+
+- Elegir el tipo de comprobante: Emitidos, Recibidos o Ambos.
+
+- Indicar la fecha de los comprobantes deseados con el formato establecido.
+
+- Indicar que tipo de comprobantes se desea restar. (Por defecto Notas de crédito A, B, C y M).
+
+- Definir la ubicación del archivo "Lista_Excel.xlsx" (del que hemos hablado antes, y partir del cual el sistema tomará los datos de CUIT y CLAVE para cada caso que va a descargar).
+
+- Seleccionar una carpeta de destino para las descargas.
+
+
+------------
+------------
