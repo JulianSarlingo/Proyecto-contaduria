@@ -2,6 +2,28 @@ import tools
 import dataDowloader as dd
 from os import system
 
+"""
+Antes de empezar recuerda ejecutar estos comandos
+para mantener el trabajo actualizado en todas tus maquinas:
+1. Traer cambios de GitHub
+
+git pull origin main
+
+2. Ver qué cambió en tu carpeta
+
+git status
+
+3. Guardar cambios en Git
+
+git add .
+git commit -m "mensaje"
+
+4. Subir cambios a GitHub
+
+git push origin main
+
+"""
+
 
 def main():
     # ruta_base = "c:\\Users\\Julian\\Desktop\\Programacion\\Proyectos\\MarianoMortero\\V1\\"
