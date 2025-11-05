@@ -3,9 +3,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
-import time
+import time, tools, os
 # from tkinter import messagebox
-import os
 
 
 # === Funciones generales ===
@@ -21,7 +20,7 @@ def wait_until_page_loaded(dv):
         lambda d: d.execute_script("return document.readyState") == "complete"
     )
 
-def _login_user(dv, user, password):
+def _login_user(dv, user, password, velocidad):
     """
     Completa los campos de usuario y contraseña en el formulario de login de AFIP.
 
@@ -32,7 +31,9 @@ def _login_user(dv, user, password):
     """
     try:
         _write_input(dv, "F1:username", user)
+        tools.pausa(velocidad)
         _write_input(dv, "F1:password", password)
+        tools.pausa(velocidad)
     except Exception as e:
         print(f"[ERROR] Fallo al intentar loguear usuario '{user}': {e}")
 

@@ -12,22 +12,28 @@ import os
 import config_loader as cl
 from datetime import datetime, timedelta
 
-ruta_origen = "C:\\Users\\Julian\\Desktop\\Programacion\\Proyectos\\MarianoMortero\\Datos Afip\\"
-ruta_descargas = "C:\\Users\\Julian\\Downloads"
+# ruta_origen = "C:\\Users\\Julian\\Desktop\\Programacion\\Proyectos\\MarianoMortero\\Datos Afip\\"
+# ruta_descargas = "C:\\Users\\Julian\\Downloads"
 # Inicializador de datos
 
 def init(ruta_base):
     # config_file_path = "C:\\Users\\Julian\\Desktop\\Programacion\\Proyectos\\MarianoMortero\\config_program.xlsx"
     # config_file_path = ruta_base+"config_program.xlsx"
-    config_file_path = ruta_base+"Clientes 2025 juli.xlsm"
+    # config_file_path = ruta_base+"Clientes 2025 juli.xlsm"
     # config = cl.configuracion(config_file_path) # Carga la configuración del Excel
-    config = cl.procesar_config(config_file_path) # Carga la configuración del Excel
+    config = cl.procesar_config(ruta_base) # Carga la configuración del Excel
+    base_dir = os.path.dirname(ruta_base)+"\\Datos Afip"
 
-    base_dir = ruta_base+"Datos Afip"
+    
+    # base_dir = ruta_base.strip("\\")+"\\Datos Afip"
+    # base_dir = +"\\Datos Afip"
     os.makedirs(base_dir, exist_ok=True)
 
-    return config
+    return base_dir, config
     
+# === Funciones de ayuda ===
+def pausa(velocidad):
+    time.sleep(1/velocidad)
 
 # --- COMIENZO DE LA FUNCIÓN _encontrar_todos_elementos (CÓPIALA EXACTAMENTE COMO LA TENEMOS) ---
 def _encontrar_todos_elementos(dv, xpath, timeout=10):
@@ -82,7 +88,49 @@ def change_window(dv, original_window):
             # print("[INFO] Cambiado a la nueva pestaña")
             break
 
-def open_chrome():
+def open_chrome(download_dir):
+    """
+    Abre una nueva instancia del navegador Chrome y carga la página de login de AFIP.
+    """
+    # download_dir = r"c:\Users\Julian\Desktop\Programacion\Proyectos\MarianoMortero\Datos Afip"
+    
+    # Crea el directorio si no existe (descomenta si es necesario)
+    # if not os.path.exists(download_dir):
+    #     os.makedirs(download_dir)
+
+    options = Options()
+
+    # 1. Combina TODAS las preferencias en un único diccionario 'prefs'
+    #    Tanto la ruta de descarga como la configuración de descargas automáticas.
+    prefs = {
+        # Configuración de DESCARGA
+        "download.default_directory": download_dir,
+        "download.prompt_for_download": False,  # No preguntar dónde guardar
+        "download.directory_upgrade": True,
+        
+        # Configuración de CONTENIDO/SEGURIDAD (para descargas automáticas, etc.)
+        "profile.default_content_setting_values.automatic_downloads": 1
+    }
+
+    # Aplica TODAS las preferencias en UNA SOLA LLAMADA.
+    options.add_experimental_option("prefs", prefs)
+
+    # Opciones que SÍ están bien
+    options.add_experimental_option("detach", True)
+    
+    # --- Opciones para suprimir errores de consola ---
+    options.add_argument("--log-level=3") 
+    options.add_experimental_option('excludeSwitches', ['enable-logging']) 
+    # -----------------------------------------------------
+
+    dv = webdriver.Chrome(options=options)
+
+    # Abrir la página
+    dv.get("https://auth.afip.gob.ar/contribuyente_/login.xhtml")
+    # ct.wait_until_page_loaded(dv) 
+    return dv
+
+def open_chrome2(download_directory):
     """
     Abre una nueva instancia del navegador Chrome y carga la página de login de AFIP.
 
@@ -92,17 +140,17 @@ def open_chrome():
     Returns:
         webdriver: Instancia del navegador Chrome configurada.
     """
-    # download_directory = os.path.join("c:\\Users\\Julian\\Desktop\\Programacion\\Proyectos\\MarianoMortero\\", "Datos Afip")
+    download_directory = os.path.join("c:\\Users\\Julian\\Desktop\\Programacion\\Proyectos\\MarianoMortero\\", "Datos Afip\\")
     # if not os.path.exists(download_directory):
     #     os.makedirs(download_directory)
 
     options = Options()
     # Esta es la opción clave para cambiar la ruta de descarga
-    # options.add_experimental_option("prefs", {
-    #     "download.default_directory": download_directory,
-    #     "download.prompt_for_download": False,  # No preguntar dónde guardar
-    #     "download.directory_upgrade": True
-    # })
+    options.add_experimental_option("prefs", {
+        "download.default_directory": download_directory,
+        "download.prompt_for_download": False,  # No preguntar dónde guardar
+        "download.directory_upgrade": True
+    })
     options.add_experimental_option("detach", True)
     prefs = {
         "profile.default_content_setting_values.automatic_downloads": 1
@@ -125,32 +173,19 @@ def open_chrome():
 
 # === Login en AFIP ===
 
-def login_afip(dv, user, password):
+def login_afip(dv, user, password, velocidad):
     """
     Inicia sesión en AFIP usando las credenciales extraídas del archivo de texto.
 
     Args:
         dv (webdriver): Driver de Selenium.
-
-    Returns:
-        str: Usuario utilizado para loguearse, si fue exitoso.
+        user (str): Nombre de usuario (CUIT).
+        password (str): Contraseña del usuario.
+        velocidad (int): Velocidad de espera entre acciones.
     """
+
     # Escribir usuario
-    ct._login_user(dv, user, password)
-
-    """
-    try:
-        credentials = usartxt.extract_data("./usuarios_contrasenias.txt")
-    except Exception as e:
-        print(f"[ERROR] No se pudieron cargar las credenciales: {e}")
-        return
-    """
-    """
-    for user, password in credentials.items():
-        ct._login_user(dv, user, password)
-        return user
-        # break  # Solo se loguea el primero encontrado
-    """
+    ct._login_user(dv, user, password, velocidad)
 
 def _servicios(dv):
     """
@@ -181,7 +216,7 @@ def ingresar_mis_comprobantes(dv):
 def encontrar_empresas(dv):
     xpath = "//small[contains(normalize-space(.), '-') and string-length(normalize-space(.)) > 10]"
 
-    os.system('cls')
+    # os.system('cls')
     elementos = _encontrar_todos_elementos(dv, xpath)
     return elementos
 
@@ -197,7 +232,7 @@ def seleccionar_empresa(dv, element):
 
 # === Descargar comprobantes ===
 
-def buscar_descargar(dv, xpath):
+def buscar_descargar(dv, xpath, velocidad):
     """
     Realiza el flujo de búsqueda y descarga de comprobantes para una sección específica (emitidos o recibidos).
 
@@ -206,17 +241,17 @@ def buscar_descargar(dv, xpath):
         xpath (str): XPath del encabezado de sección (h3).
     """
     ct._click_element_by(dv, By.XPATH, xpath)
-    time.sleep(0.3)
+    pausa(velocidad)
     ct._click_element_by(dv, By.ID, "btnCalendarioFechaEmision")
-    time.sleep(0.3)
+    pausa(velocidad)
     ct._click_element_by(dv, By.CSS_SELECTOR, "li[data-range-key='Mes Pasado']")
-    time.sleep(0.3)
+    pausa(velocidad)
     ct._click_element_by(dv, By.ID, "buscarComprobantes")
-    time.sleep(0.3)
+    pausa(velocidad)
     return ct._click_span_descarga(dv)
 
 
-def descargar_comprobantes(dv, ruta_carpeta=""):
+def descargar_comprobantes(dv, ruta_carpeta="", velocidad=1):
     """
     Descarga los comprobantes de las secciones "Emitidos" y "Recibidos".
 
@@ -226,17 +261,18 @@ def descargar_comprobantes(dv, ruta_carpeta=""):
     Args:
         dv (webdriver): Driver de Selenium.
     """
-    ruta_destino = ruta_origen+""
+    # ruta_destino = ruta_origen+""
     secciones = ["Emitidos", "Recibidos"]
     for titulo in range(len(secciones)):
+        pausa(velocidad)
 
         xpath = f"//h3[normalize-space(text())='{secciones[titulo]}']"
-        tipo = buscar_descargar(dv, xpath)
+        tipo = buscar_descargar(dv, xpath, velocidad)
 
         if titulo == 0:
             tn.retroceder_paginas(dv)
         else:
-            time.sleep(1)
+            pausa(velocidad)
         
 # === Navegación a "Mis Retenciones" ===
 
@@ -280,7 +316,7 @@ def obtener_fechas_mes_pasado_formato_ddMMAAAA():
     return primer_dia_str, ultimo_dia_str
 
 
-def descarga_retenciones(dv, cuit):
+def descarga_retenciones(dv, cuit, velocidad=1):
     """
     Inicia el proceso de descarga de retenciones para un CUIT específico.
 
@@ -297,13 +333,13 @@ def descarga_retenciones(dv, cuit):
             impuesto = "767"  # Corregido el bug de asignación
         ct.seleccionar_opcion_por_value(dv, "select#impuestos", impuesto)
 
-        # """PREGUNTAR LAS FECHAS DESDE Y HASTA"""
-
         primer_dia, ultimo_dia = obtener_fechas_mes_pasado_formato_ddMMAAAA()
 
         # primer_dia, ultimo_dia = '01012024', '01012025'
         ct._write_input(dv, "fechaRetencionDesde", primer_dia, by=By.NAME, press_enter=False)
         ct._write_input(dv, "fechaRetencionHasta", ultimo_dia, by=By.NAME, press_enter=False)
+        
+        pausa(velocidad)
 
         ct._click_element_by(dv, By.CSS_SELECTOR, 'input.inputbutton[type="submit"][value="Consultar"]')
 

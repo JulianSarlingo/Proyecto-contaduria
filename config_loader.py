@@ -4,12 +4,6 @@ from openpyxl import load_workbook
 from os import system
 system('cls')
 
-
-
-import pandas as pd
-import re
-from openpyxl import load_workbook
-
 # ==== helpers ====
 def contar_filas_utiles(ruta_excel, start_row=9, col_clave="A"):
     """
@@ -35,7 +29,7 @@ def configuracion(ruta_excel):
     Lee la configuración desde un Excel, detectando automáticamente la cantidad de filas útiles.
     Devuelve un DataFrame limpio con solo las columnas necesarias.
     """
-    columnas_utiles = ["Clientes", "cuit ", "Clave Afip", "e-mail", "tipo monotributo"]
+    columnas_utiles = ["Clientes", "CUIT", "Clave Afip", "e-mail", "tipo monotributo"]
 
     n_filas = contar_filas_utiles(ruta_excel, start_row=10, col_clave="A")
 
@@ -56,6 +50,10 @@ def configuracion(ruta_excel):
 # ==== helpers para CUIT ====
 def _digits11(s: str) -> str:
     """Devuelve solo los dígitos (11) de un CUIT o '' si no cumple."""
+    try:
+        s = int(s)
+    except ValueError:
+        return ""
     d = re.sub(r"\D", "", str(s))
     return d if len(d) == 11 else ""
 
@@ -69,7 +67,9 @@ def _es_persona(cuit: str) -> bool:
 def indexar_sociedades(df):
     sociedades_por_dueno = {}
     for _, r in df.iterrows():
-        cuit_fila  = _digits11(r["cuit"])
+        # cuit = int(r["cuit"])
+        # monotributo = r["tipo monotributo"]
+        cuit_fila  = _digits11(r["CUIT"])
         dueno_cuit = _digits11(r["tipo monotributo"])
 
         if cuit_fila.startswith("30") and dueno_cuit:
@@ -89,7 +89,7 @@ def construir_config(df, sociedades_por_dueno):
         nombre   = str(row["Clientes"]).strip()
         password = str(row["Clave Afip"]).strip()
         email    = str(row["e-mail"]).strip()
-        cuit_p   = _digits11(row["cuit"])
+        cuit_p   = _digits11(row["CUIT"])
 
         if not _es_persona(cuit_p):
             continue
