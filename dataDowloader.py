@@ -40,7 +40,7 @@ def seccion_mis_retenciones(dv, original_window, cuit, velocidad):
 
     tools.change_window(dv, original_window)
 
-    tools.descarga_retenciones(dv, cuit, velocidad)
+    tools.descarga_retenciones_nueva(dv, cuit, velocidad)
 
     tn.cerrar_pestana_actual(dv) # Cierra pestaña de retenciones
 

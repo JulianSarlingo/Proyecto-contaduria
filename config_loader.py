@@ -24,7 +24,7 @@ def contar_filas_utiles(ruta_excel, start_row=9, col_clave="A"):
 
 
 # ==== paso 1: leer Excel y devolver DataFrame ====
-def configuracion(ruta_excel):
+def configuracion(ruta_excel, sheet_name):
     """
     Lee la configuración desde un Excel, detectando automáticamente la cantidad de filas útiles.
     Devuelve un DataFrame limpio con solo las columnas necesarias.
@@ -35,6 +35,7 @@ def configuracion(ruta_excel):
 
     df = pd.read_excel(
         ruta_excel,
+        sheet_name=sheet_name,
         skiprows=8,  # encabezado en fila 9
         nrows=n_filas,
         usecols=columnas_utiles,
@@ -109,10 +110,10 @@ def construir_config(df, sociedades_por_dueno):
 
 
 # ==== función orquestadora ====
-def procesar_config(ruta_excel):
+def procesar_config(ruta_excel, sheet_name):
     """
     Orquesta todo: lee el Excel, indexa sociedades, arma config final.
     """
-    df = configuracion(ruta_excel)
+    df = configuracion(ruta_excel, sheet_name)
     sociedades = indexar_sociedades(df)
     return construir_config(df, sociedades)

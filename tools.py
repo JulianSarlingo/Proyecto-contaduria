@@ -16,12 +16,12 @@ from datetime import datetime, timedelta
 # ruta_descargas = "C:\\Users\\Julian\\Downloads"
 # Inicializador de datos
 
-def init(ruta_base):
+def init(ruta_base, sheet_name):
     # config_file_path = "C:\\Users\\Julian\\Desktop\\Programacion\\Proyectos\\MarianoMortero\\config_program.xlsx"
     # config_file_path = ruta_base+"config_program.xlsx"
     # config_file_path = ruta_base+"Clientes 2025 juli.xlsm"
     # config = cl.configuracion(config_file_path) # Carga la configuración del Excel
-    config = cl.procesar_config(ruta_base) # Carga la configuración del Excel
+    config = cl.procesar_config(ruta_base, sheet_name) # Carga la configuración del Excel
     base_dir = os.path.dirname(ruta_base)+"\\Datos Afip"
 
     
@@ -284,6 +284,15 @@ def ingresar_mis_retenciones(dv):
         dv (webdriver): Driver de Selenium.
     """
     ct._click_element_by(dv, By.XPATH, "//h3[normalize-space(text())='MIS RETENCIONES']")
+    # print("[INFO] Ingresando a MIS RETENCIONES...")
+    # print("[ORDEN] Espere mientras se carga la página...")
+    # print("[ORDEN] Haga click en el boton que le indica la pagina para ir a la versión anterior...")
+    # print("[ORDEN] Cuando la página haya cargado completamente, presione Enter en esta consola para continuar...")
+    # os.system('pause')
+
+    # ct._click_element_by(dv, By.ID, "__EVID__481888__EV__e-button__")
+    # ct._click_element_by(dv, By.XPATH, "//button[contains(., 'click aquí')]")
+    # ct._click_element_by(dv, By.CSS_SELECTOR, "button.e-button")
 
 
 def obtener_fechas_mes_pasado_formato_ddMMAAAA():
@@ -310,8 +319,8 @@ def obtener_fechas_mes_pasado_formato_ddMMAAAA():
     primer_dia_mes_pasado_dt = ultimo_dia_mes_pasado_dt.replace(day=1)
 
     # Formateamos las fechas a 'ddMMyyyy'
-    primer_dia_str = primer_dia_mes_pasado_dt.strftime("%d%m%Y")
-    ultimo_dia_str = ultimo_dia_mes_pasado_dt.strftime("%d%m%Y")
+    primer_dia_str = primer_dia_mes_pasado_dt.strftime("%d/%m/%Y")
+    ultimo_dia_str = ultimo_dia_mes_pasado_dt.strftime("%d/%m/%Y")
 
     return primer_dia_str, ultimo_dia_str
 
@@ -346,3 +355,44 @@ def descarga_retenciones(dv, cuit, velocidad=1):
         ct._click_span_descarga(dv, type="Retenciones")
 
         tn.retroceder_paginas(dv)
+
+# === Nueva función de descarga de retenciones (cambió la web, usar cuando esté lista) ===
+
+def descarga_retenciones_nueva(dv, cuit, velocidad=1):
+    """
+    Inicia el proceso de descarga de retenciones para un CUIT específico.
+
+    Args:
+        dv (webdriver): Driver de Selenium.
+        cuit (str): CUIT a utilizar para filtrar las retenciones.
+    """
+    # ct.wait_until_page_loaded(dv)
+    impuesto = ""
+    for i in range(2):
+        ct._wait_for_page_ready(dv, modo="clickeable", by=By.ID, identifier='btnConsultarRetenciones')
+        pausa(velocidad)
+        if i == 0:
+            impuesto = "216"
+        elif i == 1:
+            impuesto = "767"  # Corregido el bug de asignación
+        ct._write_input(dv, "selectImpuestos", impuesto)
+        ct._write_input(dv, "cuitAgenteRetencion", cuit)
+
+        if i == 1:
+            ct._click_element_by(dv, By.XPATH, '//label[contains(text(), "Retención y percepción")]')
+
+        primer_dia, ultimo_dia = obtener_fechas_mes_pasado_formato_ddMMAAAA()
+
+        # primer_dia, ultimo_dia = '01012024', '01012025'
+        pausa(velocidad)
+        ct._write_input_force(dv, "datePickerFechasRetencionesDesde__input", primer_dia, by=By.ID, press_enter=False)
+        # ct._write_input(dv, "datePickerFechasRetencionesDesde__input", primer_dia, by=By.ID, press_enter=False)
+        pausa(velocidad)
+        ct._write_input_force(dv, "datePickerFechasRetencionesHasta__input", ultimo_dia, by=By.ID, press_enter=False)
+
+
+        ct._click_element_by(dv, By.ID, 'btnConsultarRetenciones')
+
+        ct._click_span_descarga(dv, type="Retenciones")
+
+        # tn.retroceder_paginas(dv)

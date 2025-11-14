@@ -9,6 +9,56 @@ import time, tools, os
 
 # === Funciones generales ===
 
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+def _wait_for_page_ready(driver, modo="completo", timeout=15, by=None, identifier=None, loader_class=None):
+    """
+    Espera que la página esté lista según el modo especificado.
+
+    Args:
+        driver (webdriver): Driver de Selenium.
+        modo (str): Estrategia de espera. Puede ser:
+            - "document": espera que document.readyState sea 'complete'
+            - "elemento": espera que un elemento esté presente
+            - "clickeable": espera que un elemento esté listo para clic
+            - "invisible": espera que un loader desaparezca
+            - "completo": combina todas las anteriores
+        timeout (int): Tiempo máximo de espera en segundos.
+        by (By): Tipo de selector (By.ID, By.NAME, etc.) — requerido para "elemento" y "clickeable"
+        identifier (str): Valor del selector — requerido para "elemento" y "clickeable"
+        loader_class (str): Clase del loader — requerido para "invisible"
+    """
+    try:
+        if modo in ["document", "completo"]:
+            WebDriverWait(driver, timeout).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+            print("[INFO] DOM completamente cargado")
+
+        if modo in ["elemento", "completo"] and by and identifier:
+            WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located((by, identifier))
+            )
+            print(f"[INFO] Elemento '{identifier}' presente")
+
+        if modo in ["clickeable", "completo"] and by and identifier:
+            WebDriverWait(driver, timeout).until(
+                EC.element_to_be_clickable((by, identifier))
+            )
+            print(f"[INFO] Elemento '{identifier}' está clickeable")
+
+        if modo in ["invisible", "completo"] and loader_class:
+            WebDriverWait(driver, timeout).until(
+                EC.invisibility_of_element_located((By.CLASS_NAME, loader_class))
+            )
+            print(f"[INFO] Loader '{loader_class}' desapareció")
+
+    except Exception as e:
+        print(f"[ERROR] Falló la espera en modo '{modo}': {e}")
+
+
 def wait_until_page_loaded(dv):
     """
     Espera hasta que el documento esté completamente cargado (readyState == 'complete').
@@ -36,6 +86,34 @@ def _login_user(dv, user, password, velocidad):
         tools.pausa(velocidad)
     except Exception as e:
         print(f"[ERROR] Fallo al intentar loguear usuario '{user}': {e}")
+
+
+def _write_input_force(dv, field_identifier, value, by=By.ID, press_enter=True):
+    """
+    Fuerza la escritura en un campo de texto, limpiando el valor con JavaScript si .clear() no funciona.
+
+    Args:
+        dv (webdriver): Driver de Selenium.
+        field_identifier (str): ID o NAME del campo.
+        value (str): Valor a escribir (ej. "01/10/2025").
+        by (By): Tipo de localizador (By.ID o By.NAME).
+        press_enter (bool): Si debe simular ENTER al final.
+    """
+    try:
+        wait_until_page_loaded(dv)
+        input_field = dv.find_element(by, field_identifier)
+
+        # 🔥 Limpieza forzada con JS
+        dv.execute_script("arguments[0].value = '';", input_field)
+
+        # 🧠 Escritura manual
+        input_field.send_keys(value)
+        if press_enter:
+            input_field.send_keys(Keys.RETURN)
+
+        # print(f"[INFO] Fecha '{value}' escrita correctamente en '{field_identifier}'")
+    except Exception as e:
+        print(f"[ERROR] No se pudo escribir en el campo: {e}")
 
 def _write_input(dv, field_identifier, value, by=By.ID, press_enter=True):
     """
@@ -171,7 +249,7 @@ def _click_span_descarga(dv, excel="Excel", csv="CSV", type="Comprobantes"):
             try:
                 xpath = f"//button[.//span[normalize-space(text())='{texto}']]"
                 _click_element_by(dv, By.XPATH, xpath, 4)
-                print(f"[INFO] Se hizo clic en el botón <span> '{texto}' correctamente.")
+                # print(f"[INFO] Se hizo clic en el botón <span> '{texto}' correctamente.")
                 # os.system('pause')
                 time.sleep(0.4)
                 return texto
@@ -184,4 +262,6 @@ def _click_span_descarga(dv, excel="Excel", csv="CSV", type="Comprobantes"):
             selector = "a[href*='consultaMisRetenciones.do?method=exportExcel']"
             _click_element_by(dv, By.CSS_SELECTOR, selector, 4)
         except Exception as e:
-            print(f"[WARN] No se encontró el enlace de exportación: {e}")
+            boton = "btnNuevaBusqueda"
+            print(f"[WARN] No se encontró el boton de descarga de retenciones")
+            _click_element_by(dv, By.ID, boton, 4)
