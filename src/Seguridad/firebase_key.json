@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "licencias-arcadownloader-2305",
+  "private_key_id": "46e9b451639941aaff06d6288bffad9b1714849e",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC+p/bDrpBHjqyy\nRbC6HeXBXw5iwAzV7lbSGlcmTdB+Aw30IJuH4dlBCPj+R9yWa16FLPZbIRB/q6Rh\nUSf48nV6WQswvjyQ/bjWQwriyoN17bBVwnLNiybbvehJFPSsDuEMQAA04HBIdOh6\nVGsR4dJDiyvzRcBi2dO/7ER5CGwLdSOOY4rTL9XAfipiEB5jR1BCafs1cbX7ruMf\nYFE10HC9DqwgNZaz5TX66mDO6rZ4L+s79ejvMx7APa7kwvI5Q+XgpEukpDEgSBpE\nAfi+u/Y9LZdpcAwN4cPbgrrxPMCbTI/SE/kAYf58HEVlgXyrBOLGa1KkF1mRLJnU\nNwaeQHxhAgMBAAECggEAMToaH21fqHJAyejvmCanD5Y1Fy9CQSyAc1BEx0mZNygf\nvrR6pAue9klUTQeN/7KqXZV96IqxgV12nIABY6hqx9Pc7VF5PvCb/Iqj8WnbpqPf\n/0ytKsAuoNc4dkI4aIKQ/gI6a2y14Sd6bTeFy8C0cycoinAsm/llUK03As83Yn+B\njOlu29y8eisP+PsBV0G6HUQXzYMNewObogYwn1thdTz6vrXwv4/6GdLDMQNWnrfK\nspn+DHFl1ZCnUfKBTMvb4seNhCWTShRRJ7v4LLxkYqgFdsNQR4Y7eMl9JeewWezX\n6gglfDIOPCzszIsaoMtc7e9fSNDYxAySbD8yoJfi/wKBgQD/YCJ74tEtzaFrjoGh\n6PHEd0lD0IMgo9TpuK8SRJgp+hTKxcX0QuQlp2xv7+kLUTX7/z5kujXeQgT/6d8/\nefckQuz0jdb74OAoAeeWjDm+P8bTU2Ttn2/zsucysBC/qMLvMMY46R5BTB70FbJp\nGendvJtOXUJsSDUTuI/cn/ap0wKBgQC/H1CXZxsUIqVIEroLXzMpGBOi+A2TGHYA\nbSmdcV/2NQg811IO/0snbj/E9LkpjyGM3VHwsCzlQKXalFHS4ENIcsgql7RDAy9J\nLeWV+svZIdzrTYve8kSncIHYP8RzmTE11q8xpi9FXWNmF2sO4OMEeVv91DrgutPr\nPvoEpr0MewKBgA63uqULKGUMYc4yE1SCeVSKT2WiIbyC1KV3qFdULrTUndgl18fB\nBycIZB57ZCHr10GjrzPc63fYtDMPhndBDzY+ySs69XXkuuZzXaZ2hGlrgYjyWHG9\na5VO7TYloYF6N2nTlMj43m6C9ZG5omOeQ7UsxoKYq1hUPQLa8yeS7INTAoGACaBl\nKcsatQ/trUysLEh2RjqdOpct79vKjcjx0KlWQQt4x7+8tV6shWbrNVtyPCKmePbo\n2qu1BzMTZ4gS+wEqwmptpJ+Rh9KQPipepwhD3kLzYrK8OdWQGbL0B1Vm6r+rl9+h\nYWnSdbb3e7vwO4aeSKpoNMfM02b1p6K7ayKO4SMCgYASgyB47RvKLjcnmy2u4Xn6\n1+b6u3OdMpjvos7wEb+SqziXlXnHxd8G0rwV48dplBgpYG9na1vFiYlRAaxhjaQF\nds1GyoQ0zGufg/usDN7ZqO0tuSRIaRO76XnjGWi0uGRsssG3d87GNWt3kG40rT7P\nqnKM6GBdsOtFME/arda5oQ==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@licencias-arcadownloader-2305.iam.gserviceaccount.com",
+  "client_id": "103466939963625932258",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40licencias-arcadownloader-2305.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

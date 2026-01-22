@@ -1,0 +1,17 @@
+# --- Ignorar Archivos de Datos Sensibles ---
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+
+# --- Ignorar Archivos Comprimidos/Temporales ---
+*.rar
+*.zip
+*.log
+__pycache__/
+
+# --- Ignorar Carpetas de Sistema ---
+/data
+/venv
+.env
+.DS_Store

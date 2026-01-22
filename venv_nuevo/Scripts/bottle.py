@@ -1,4 +1,4 @@
-#!C:\Users\Julian\Desktop\Programacion\Proyectos\MarianoMortero\venv_nuevo\Scripts\python.exe
+#!C:\Users\Julian\Desktop\Programacion\Proyectos\MarianoMorteo\venv_nuevo\Scripts\python.exe
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 """

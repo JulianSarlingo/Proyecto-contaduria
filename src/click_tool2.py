@@ -1,0 +1,332 @@
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
+import time, tools
+from logger import log_error
+# from tkinter import messagebox
+
+
+# === Funciones generales ===
+
+def _wait_for_page_ready(driver, modo="completo", timeout=15, by=None, identifier=None, loader_class=None, returnable=False):
+    """
+    Espera que la página esté lista según el modo especificado.
+
+    Args:
+        driver (webdriver): Driver de Selenium.
+        modo (str): Estrategia de espera. Puede ser:
+            - "document": espera que document.readyState sea 'complete'
+            - "elemento": espera que un elemento esté presente
+            - "clickeable": espera que un elemento esté listo para clic
+            - "invisible": espera que un loader desaparezca
+            - "completo": combina todas las anteriores
+        timeout (int): Tiempo máximo de espera en segundos.
+        by (By): Tipo de selector (By.ID, By.NAME, etc.) — requerido para "elemento" y "clickeable"
+        identifier (str): Valor del selector — requerido para "elemento" y "clickeable"
+        loader_class (str): Clase del loader — requerido para "invisible"
+    """
+    try:
+        if modo in ["document", "completo"]:
+            WebDriverWait(driver, timeout).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+            print("[INFO] DOM completamente cargado")
+
+        if modo in ["elemento", "completo"] and by and identifier:
+            elemento = WebDriverWait(driver, timeout).until(
+                EC.presence_of_element_located((by, identifier))
+            )
+            print(f"[INFO] Elemento '{identifier}' presente")
+            if returnable:
+                return elemento
+
+        if modo in ["clickeable", "completo"] and by and identifier:
+            elemento = WebDriverWait(driver, timeout).until(
+                EC.element_to_be_clickable((by, identifier))
+            )
+            print(f"[INFO] Elemento '{identifier}' está clickeable")
+            if returnable:
+                return elemento
+
+
+        if modo in ["invisible", "completo"] and loader_class:
+            WebDriverWait(driver, timeout).until(
+                EC.invisibility_of_element_located((By.CLASS_NAME, loader_class))
+            )
+            print(f"[INFO] Loader '{loader_class}' desapareció")
+
+    except Exception as e:
+        print(f"[ERROR] Falló la espera en modo '{modo}'")
+        raise
+
+
+def wait_until_page_loaded(dv):
+    """
+    Espera hasta que el documento esté completamente cargado (readyState == 'complete').
+
+    Args:
+        dv (webdriver): Instancia del navegador (driver de Selenium).
+    """
+    _wait_for_page_ready(dv, "document", 10)
+
+def detectar_error_login(dv):
+    try:
+        error_xpath = "//span[contains(text(), 'incorrecto') or contains(text(), 'incorrecta')]"
+        errores = dv.find_elements(By.XPATH, error_xpath)
+        return len(errores) > 0
+    except:
+        return False
+
+def detectar_cambio_clave(dv):
+    """
+    Detecta si AFIP exige cambio obligatorio de contraseña.
+    Basado en los elementos visibles de la pantalla real.
+    """
+    patrones = [
+        "//h4[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'cambiar clave fiscal')]",
+        "//span[@id='F1:msg']",
+    ]
+
+    for xp in patrones:
+        try:
+            _wait_for_page_ready(dv, "elemento", 1, By.XPATH, xp)
+            return True
+        except:
+            pass
+
+    return False
+
+def _login_user(dv, user, password, velocidad):
+    """
+    Completa los campos de usuario y contraseña en el formulario de login de AFIP.
+    """
+
+    try:
+        _write_input(dv, "F1:username", user)
+        tools.pausa(velocidad)
+
+        _write_input(dv, "F1:password", password)
+        tools.pausa(velocidad)
+
+        # Hacer clic en Aceptar
+        # _click_element_by(dv, By.ID, "F1:btnIngresar")
+        # tools.pausa(velocidad)
+
+        # 🔥 NUEVO: detectar si AFIP pide cambio obligatorio de contraseña
+        if detectar_cambio_clave(dv):
+            log_error(user, "El usuario debe cambiar la contraseña")
+            raise Exception("Cambio obligatorio de contraseña")
+
+        # 🔥 EXISTENTE: login incorrecto
+        if detectar_error_login(dv):
+            log_error(user, "Login incorrecto (CUIT o contraseña inválidos)")
+            raise Exception("Login incorrecto")
+
+    except Exception as e:
+        log_error(user, f"Falló login: {e}")
+        print(f"[ERROR] Fallo al intentar loguear usuario '{user}': {e}")
+        raise  # se propaga para que Comprobantes.py lo registre
+
+
+def _write_input_force(dv, field_identifier, value, by=By.ID, press_enter=True):
+    """
+    Fuerza la escritura en un campo de texto, limpiando el valor con JavaScript si .clear() no funciona.
+
+    Args:
+        dv (webdriver): Driver de Selenium.
+        field_identifier (str): ID o NAME del campo.
+        value (str): Valor a escribir (ej. "01/10/2025").
+        by (By): Tipo de localizador (By.ID o By.NAME).
+        press_enter (bool): Si debe simular ENTER al final.
+    """
+    try:
+        wait_until_page_loaded(dv)
+        input_field = dv.find_element(by, field_identifier)
+
+        # 🔥 Limpieza forzada con JS
+        dv.execute_script("arguments[0].value = '';", input_field)
+
+        # 🧠 Escritura manual
+        input_field.send_keys(value)
+        if press_enter:
+            input_field.send_keys(Keys.RETURN)
+
+        # print(f"[INFO] Fecha '{value}' escrita correctamente en '{field_identifier}'")
+    except Exception as e:
+        print(f"[ERROR] No se pudo escribir en el campo: {e}")
+
+def _write_input(dv, field_identifier, value, by=By.ID, press_enter=True):
+    """
+    Escribe un valor en un campo de texto, identificado por ID o NAME, y opcionalmente simula ENTER.
+
+    Args:
+        dv (webdriver): Driver de Selenium.
+        field_identifier (str): Valor del atributo (ID o NAME).
+        value (str): Texto a escribir.
+        by (By): Tipo de localizador (By.ID o By.NAME).
+        press_enter (bool): Si debe simular ENTER al final.
+    """
+    try:
+        wait_until_page_loaded(dv)
+        input_field = dv.find_element(by, field_identifier)
+        input_field.clear()
+        input_field.send_keys(value)
+        if press_enter:
+            input_field.send_keys(Keys.RETURN)
+        # print(f"[INFO] Escribiendo '{value}' en el campo ({by}='{field_identifier}')")
+    except Exception as e:
+        print(f"[ERROR] No se pudo escribir en el campo: {e}")
+
+
+def _click_element(dv, element, scroll=True, force_js=True):
+    # try:
+    if scroll:
+        dv.execute_script("arguments[0].scrollIntoView(true);", element)
+    if force_js:
+        dv.execute_script("arguments[0].click();", element)
+    else:
+        element.click()
+
+
+def _click_element_by(dv, by, value, timeout=10, scroll=True, force_js=True):
+    """
+    Hace clic en un elemento ubicado por cualquier estrategia (ID, CSS, XPath, etc.).
+
+    Args:
+        dv (webdriver): Driver de Selenium.
+        by (By): Estrategia de localización (By.ID, By.CSS_SELECTOR, By.XPATH, etc.).
+        value (str): Valor asociado a la estrategia (por ejemplo, el selector o XPath).
+        timeout (int): Tiempo máximo de espera.
+        scroll (bool): Si se debe hacer scroll hacia el elemento.
+        force_js (bool): Si se debe hacer clic usando JavaScript (recomendado).
+    """
+    # try:
+    for intento in range (4):
+        try:
+            element = _wait_for_page_ready(dv, "elemento", timeout, by, value, returnable=True)
+            # element = WebDriverWait(dv, timeout).until(
+            #     EC.element_to_be_clickable((by, value))
+            # )
+            _click_element(dv, element, scroll, force_js)
+            break
+        except:
+            time.sleep(1)
+
+def seleccionar_opcion_por_value(dv, selector_css, valor):
+    """
+    Selecciona una opción en un <select> por su atributo 'value'.
+
+    Args:
+        driver (webdriver): Driver de Selenium.
+        selector_css (str): Selector CSS que identifica el <select>.
+        valor (str): Valor del atributo 'value' de la opción a seleccionar.
+    """
+    try:
+        # print(f"[INFO] Buscando <select> con selector: {selector_css}")
+        select_element = dv.find_element(By.CSS_SELECTOR, selector_css)
+        select_obj = Select(select_element)
+        select_obj.select_by_value(valor)
+        # print(f"[INFO] Opción con value='{valor}' seleccionada correctamente.")
+    except Exception as e:
+        print(f"[ERROR] No se pudo seleccionar la opción con value='{valor}':")
+
+
+def buscar_botones_descargables(dv, textos=["Excel", "CSV"], timeout=10):
+    """
+    Busca todos los botones visibles que contengan un <span> con texto específico
+    y devuelve los elementos clickeables (visibles y renderizados).
+
+    Args:
+        dv (webdriver): WebDriver de Selenium.
+        textos (list): Lista de textos esperados dentro del <span> (por ejemplo, ["Excel", "CSV"]).
+        timeout (int): Tiempo máximo para esperar que aparezcan en el DOM.
+
+    Returns:
+        list: Lista de elementos <button> que son válidos para hacer clic.
+    """
+    botones_validos = []
+
+    for texto in textos:
+        try:
+            xpath = f"//button[.//span[normalize-space(text())='{texto}']]"
+            botones = WebDriverWait(dv, timeout).until(
+                EC.presence_of_all_elements_located((By.XPATH, xpath))
+            ) # esto se deja asi por ahora
+
+            for boton in botones:
+                visible = dv.execute_script(
+                    "return (arguments[0].offsetParent !== null && arguments[0].offsetWidth > 0);",
+                    boton
+                )
+                if visible:
+                    botones_validos.append((texto, boton))
+
+        except Exception as e:
+            print(f"[WARN] No se encontraron botones para texto '{texto}': {e}")
+
+    return botones_validos
+
+def _click_span_descarga(dv, excel="Excel", csv="CSV", type="Comprobantes"):
+    """
+    Busca y hace clic en botones de descarga según el tipo de proceso.
+
+    Para type="Comprobantes":
+        Busca botones visuales con etiquetas <span> que tengan texto igual a 'Excel' o 'CSV'.
+
+    Para type="Retenciones":
+        Busca un enlace <a> con un href que contiene 'consultaMisRetenciones.do?method=exportExcel'.
+
+    Args:
+        dv (webdriver): Instancia activa del driver de Selenium.
+        excel (str): Texto del botón de descarga para Excel. Default: "Excel".
+        csv (str): Texto del botón de descarga para CSV. Default: "CSV".
+        type (str): Tipo de proceso para aplicar la estrategia de búsqueda. Puede ser "Comprobantes" o "Retenciones".
+    """
+    wait_until_page_loaded(dv)
+    opciones = [excel, csv]
+    # 👉 Buscar botones tipo <span> por texto visible
+    
+    if type == "Comprobantes":
+
+        resultados = {excel: None, csv: None}
+
+        for texto in opciones:
+            try:
+                xpath = f"//button[.//span[normalize-space(text())='{texto}']]"
+                _click_element_by(dv, By.XPATH, xpath, 4)
+                resultados[texto] = "OK"
+                time.sleep(0.4)
+
+            except Exception as e:
+                print(f"[WARN] No se encontró el botón <span> '{texto}': {e}")
+                resultados[texto] = "ERROR"
+
+        return resultados
+            
+    elif type == "Retenciones":
+        # 👉 Buscar enlace <a> con exportExcel en el href
+        try:
+            selector = "a[href*='consultaMisRetenciones.do?method=exportExcel']"
+            _click_element_by(dv, By.CSS_SELECTOR, selector, 4)
+        except Exception as e:
+            boton = "btnNuevaBusqueda"
+            print(f"[WARN] No se encontró el boton de descarga de retenciones")
+            _click_element_by(dv, By.ID, boton, 4)
+
+    elif type == "Portal":
+        resultados = {excel: None, csv: None}
+
+        for texto in opciones:
+            try:
+                xpath = f"//button[.//span[normalize-space(text())='{texto}']]"
+                _click_element_by(dv, By.XPATH, xpath, 4)
+                resultados[texto] = "OK"
+                time.sleep(0.4)
+
+            except Exception as e:
+                print(f"[WARN] No se encontró el botón <span> '{texto}': {e}")
+                resultados[texto] = "ERROR"
+
+        return resultados

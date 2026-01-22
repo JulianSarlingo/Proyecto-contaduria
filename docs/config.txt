@@ -1,0 +1,9 @@
+ruta = C:\Users\Julian\Desktop\Programacion\Proyectos\MarianoMorteo\output\CLIENTES MM 2025.xlsx
+velocidad = 1
+hoja = Clientes
+modo = Comprobantes
+
+Instrucciones:
+# Reemplazar la ruta con la del archivo Excel principal, donde aparecen los datos de los clientes, con su nombre y extensión al final, tal como el ejemplo de arriba.
+# velocidad es una configuración que establece algunas pausas, es un multiplicador por 1 segundo, en principio no tocar.
+# Añadir el nombre de la hoja donde el programa debe buscar los datos de los clientes.

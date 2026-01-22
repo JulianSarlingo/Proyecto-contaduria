@@ -1,5 +1,0 @@
-ssh-keygen -t ed25519 -C "julian.sarlingo@gmail.com"
-Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
-ssh -T git@github.com
-
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEx6BOR+d5VkHAdc4ZsxJaBQiz7qvyZg30qoRF3+zROg
