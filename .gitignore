@@ -8,10 +8,16 @@
 *.rar
 *.zip
 *.log
+*.exe
+*.msi
 __pycache__/
 
 # --- Ignorar Carpetas de Sistema ---
 /data
 /venv
+/output
+/venv_nuevo
+/dist
+/build
 .env
 .DS_Store
