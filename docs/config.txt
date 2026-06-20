@@ -1,4 +1,4 @@
-ruta = C:\Users\Julian\Desktop\Programacion\Proyectos\MarianoMorteo\output\CLIENTES MM 2025.xlsx
+ruta = C:\Users\Julian\Desktop\Programacion\Proyectos\MarianoMorteo\output\Clientes 2025 juli.xlsm
 velocidad = 1
 hoja = Clientes
 modo = Comprobantes

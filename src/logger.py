@@ -108,6 +108,44 @@ def iniciar_proteccion():
 
 
 
+# ==========================================
+# 3. Herramienta de Depuración (DEBUG)
+# ==========================================
+import functools
+
+DEBUG_MODE = True  # Variable global para activar/desactivar el modo debug
+
+def debug_trace(func):
+    """
+    Decorador para imprimir y registrar el flujo de ejecución (solo para debug).
+    Muestra mensajes claros sobre qué función inicia, termina o falla con detalle de errores.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if DEBUG_MODE:
+            msg_inicio = f"[DEBUG] ---> Entrando a función: {func.__name__} <---"
+            print(msg_inicio)
+            logging.info(msg_inicio)
+        try:
+            resultado = func(*args, **kwargs)
+            if DEBUG_MODE:
+                msg_fin = f"[DEBUG] <--- Saliendo de función (ÉXITO): {func.__name__} <---"
+                print(msg_fin)
+                logging.info(msg_fin)
+            return resultado
+        except Exception as e:
+            if DEBUG_MODE:
+                detalle = traceback.format_exc()
+                print(f"\n{'='*60}")
+                print(f"❌ [DEBUG ERROR] FALLÓ LA FUNCIÓN: {func.__name__}")
+                print(f"Tipo de error: {type(e).__name__}")
+                print(f"Detalle completo del traceback:")
+                print(detalle)
+                print(f"{'='*60}\n")
+                logging.error(f"[DEBUG ERROR] Falló {func.__name__}: {str(e)}\n{detalle}")
+            raise # Relanza la excepción para que el programa maneje el error normalmente
+    return wrapper
+
 # def log_error(usuario, mensaje):
 #     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 #     with open("errores.log", "a", encoding="utf-8") as f:

@@ -149,6 +149,7 @@ def main(service_account_path: str):
 # ---------- Ejecutar ----------
 if __name__ == "__main__":
     # Reemplazá aquí la ruta a tu serviceAccount JSON
-    SERVICE_ACCOUNT_PATH = "./version_separada/Seguridad/firebase_key.json"
+
+    SERVICE_ACCOUNT_PATH = "./src/Seguridad/firebase_key.json"
     main(SERVICE_ACCOUNT_PATH)
     system('pause')
