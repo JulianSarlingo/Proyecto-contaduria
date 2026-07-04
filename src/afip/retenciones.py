@@ -54,8 +54,18 @@ def descarga_retenciones(dv, cuit, velocidad=1, estado=None):
         estado (dict | None): Estado del usuario para registrar resultados.
     """
     for i in range(2):
-        act._wait_for_page_ready(dv, modo="clickeable", by=By.ID,
-                                  identifier='btnConsultarRetenciones')
+        # Señuelo de carga: esperamos la PRESENCIA del botón de consulta, no que
+        # sea "clickeable". El botón existe en el DOM antes de estar visible/
+        # habilitado, y de todos modos lo clickeamos por JS (que ignora la
+        # visibilidad). Usar element_to_be_clickable acá daba timeout aunque el
+        # botón estuviera y fuera usable. Timeout amplio: la pestaña recién
+        # cambiada puede seguir cargando (redirects de AFIP).
+        try:
+            act._wait_for_page_ready(dv, modo="elemento", timeout=30, by=By.ID,
+                                     identifier='btnConsultarRetenciones')
+        except Exception as e:
+            print(f"[ERROR] No apareció 'btnConsultarRetenciones' en la página: {e}")
+
         tools.pausa(velocidad)
 
         # Impuesto 216 = Ganancias, 767 = IVA
@@ -69,13 +79,16 @@ def descarga_retenciones(dv, cuit, velocidad=1, estado=None):
         # Rango de fechas del mes anterior
         primer_dia, ultimo_dia = tools.obtener_fechas_mes_pasado_formato_ddMMAAAA()
         tools.pausa(velocidad)
-        act._write_input_force(dv, "datePickerFechasRetencionesDesde__input", primer_dia, press_enter=False)
+        act._write_input_force(dv, "datePickerFechasRetencionesDesdeSiap__input", primer_dia, press_enter=False)
         tools.pausa(velocidad)
-        act._write_input_force(dv, "datePickerFechasRetencionesHasta__input", ultimo_dia, press_enter=False)
+        act._write_input_force(dv, "datePickerFechasRetencionesHastaSiap__input", ultimo_dia, press_enter=False)
         tools.pausa(velocidad)
 
-        # Ejecutar la consulta
-        act._click_element_by(dv, By.ID, 'btnConsultarRetenciones')
+        # Ejecutar la consulta. Click REAL (force_js=False): el botón es un
+        # componente Vue que ignora el click sintético de JS (isTrusted=false y
+        # sin secuencia mousedown/mouseup). El click nativo de Selenium sí
+        # dispara su handler.
+        act._click_element_by(dv, By.ID, 'btnConsultarRetenciones', force_js=False)
         tools.pausa(velocidad)
 
         # Sin datos → registrar y continuar
@@ -96,3 +109,9 @@ def descarga_retenciones(dv, cuit, velocidad=1, estado=None):
             print(f"[ERROR] No se pudo descargar retenciones para impuesto {impuesto}: {e}")
             if estado is not None:
                 set_estado(estado, f"retenciones_{impuesto}", "ERROR", str(e))
+
+        # Volver al formulario de búsqueda antes de la próxima iteración.
+        # Sin esto, la siguiente vuelta arranca en la página de resultados y
+        # 'btnConsultarRetenciones' nunca llega a estar clickeable (timeout).
+        if i == 0:
+            act._click_element_by(dv, By.ID, "btnNuevaBusqueda", 4)

@@ -9,8 +9,14 @@ import time
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import WebDriverException, InvalidSelectorException
+from selenium.common.exceptions import (
+    WebDriverException,
+    InvalidSelectorException,
+    ElementClickInterceptedException,
+    ElementNotInteractableException,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -101,16 +107,70 @@ def _write_input(dv, field_identifier, value, by=By.ID, press_enter=True):
 
 def _write_input_force(dv, field_identifier, value, by=By.ID, press_enter=True):
     """
-    Fuerza la escritura en un campo usando JavaScript para limpiar primero.
-    Útil para campos con validaciones que bloquean el clear() normal.
+    Escribe un valor en un campo íntegramente por JavaScript.
+
+    A diferencia de send_keys, esto funciona en campos 'readonly', 'disabled'
+    o cubiertos por un overlay (caso típico de los date pickers de AFIP, que
+    de otro modo lanzan 'element not interactable'). Setea el value y dispara
+    los eventos input/change/blur para que el framework (JSF/Angular) registre
+    el cambio como si el usuario hubiera tipeado.
+
+    Args:
+        dv: WebDriver.
+        field_identifier (str): ID u otro selector del campo.
+        value: Valor a escribir.
+        by: Estrategia de búsqueda (defecto: By.ID).
+        press_enter (bool): Si True, despacha un evento Enter al finalizar.
     """
     try:
         wait_until_page_loaded(dv)
-        input_field = dv.find_element(by, field_identifier)
-        dv.execute_script("arguments[0].value = '';", input_field)
-        input_field.send_keys(value)
+        input_field = WebDriverWait(dv, 15).until(
+            EC.presence_of_element_located((by, field_identifier))
+        )
+        dv.execute_script("arguments[0].scrollIntoView({block: 'center'});", input_field)
+
+        resultado = dv.execute_script(
+            """
+            const el = arguments[0], val = arguments[1];
+            const antes = el.value;
+            el.removeAttribute('readonly');
+            el.removeAttribute('disabled');
+            el.focus();
+
+            // Setter NATIVO del prototipo: imprescindible para que Angular/React
+            // detecten el cambio. Asignar el.value directo suele ser ignorado o
+            // pisado por el change-detection del framework (su modelo conserva el
+            // valor por defecto, y el botón Consultar puede quedar deshabilitado).
+            const desc = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype, 'value');
+            desc.set.call(el, val);
+
+            // React: invalidar su value tracker interno para que registre el input.
+            if (el._valueTracker) { el._valueTracker.setValue(''); }
+
+            ['keydown', 'input', 'keyup', 'change', 'blur'].forEach(function (t) {
+                el.dispatchEvent(new Event(t, {bubbles: true}));
+            });
+            return {antes: antes, despues: el.value};
+            """,
+            input_field, value,
+        )
+
+        # Verificación: los campos traen un valor por defecto, así que no alcanza
+        # con mirar si están vacíos. Avisamos si el valor no cambió respecto al
+        # previo (el componente revirtió al default → probablemente exija
+        # selección por calendario).
+        if resultado.get("despues") == resultado.get("antes"):
+            print(f"[WARN] '{field_identifier}' no cambió: sigue en "
+                  f"'{resultado.get('despues')}' tras intentar poner '{value}'. "
+                  f"El componente puede requerir interacción por calendario.")
+
         if press_enter:
-            input_field.send_keys(Keys.RETURN)
+            dv.execute_script(
+                "arguments[0].dispatchEvent(new KeyboardEvent('keydown', "
+                "{key: 'Enter', keyCode: 13, which: 13, bubbles: true}));",
+                input_field,
+            )
     except Exception as e:
         print(f"[ERROR] Falló escritura forzada en '{field_identifier}': {e}")
 
@@ -127,27 +187,74 @@ def _click_element(dv, element, scroll=True, force_js=True):
         dv: WebDriver.
         element: WebElement a clickear.
         scroll (bool): Si True, hace scroll hasta el elemento antes de clickear.
-        force_js (bool): Si True, usa JavaScript para el clic (más robusto).
+        force_js (bool): Si True, usa JavaScript para el clic. OJO: el click de
+            JS tiene isTrusted=false y dispara solo 'click' (sin mousedown/mouseup),
+            por lo que algunos componentes (Vue/React) lo ignoran. Para esos casos
+            usar force_js=False, que hace un click nativo/confiable.
     """
     if scroll:
-        dv.execute_script("arguments[0].scrollIntoView(true);", element)
+        # Centrar (no 'true', que alinea el elemento arriba de todo y lo puede
+        # tapar un header sticky, provocando ElementClickInterceptedException).
+        dv.execute_script(
+            "arguments[0].scrollIntoView({block: 'center', inline: 'center'});",
+            element,
+        )
+
     if force_js:
         dv.execute_script("arguments[0].click();", element)
     else:
-        element.click()
+        try:
+            element.click()
+        except (ElementClickInterceptedException, ElementNotInteractableException):
+            # El click nativo directo quedó tapado o mal posicionado: reintentar
+            # moviendo el mouse al elemento con ActionChains (también genera un
+            # click real/confiable, no un sintético).
+            ActionChains(dv).move_to_element(element).pause(0.1).click().perform()
+
+
+def _first_visible_element(dv, by, value):
+    """
+    Devuelve el primer elemento VISIBLE (con tamaño real) que matchea el selector.
+
+    Necesario porque el layout responsive de AFIP puede renderizar el mismo id
+    varias veces (versión desktop y mobile) y ocultar por CSS la que no
+    corresponde al viewport. find_element devolvería el primero del DOM —que
+    suele ser el oculto— y el click falla con 'has no size and location'.
+
+    Returns:
+        WebElement visible, o el primero encontrado como último recurso, o None.
+    """
+    elementos = dv.find_elements(by, value)
+    for el in elementos:
+        try:
+            size = el.size
+            if el.is_displayed() and size.get("width", 0) > 0 and size.get("height", 0) > 0:
+                return el
+        except Exception:
+            continue
+    return elementos[0] if elementos else None
 
 
 def _click_element_by(dv, by, value, timeout=10, scroll=True, force_js=True):
     """
     Busca un elemento por selector y le hace clic. Reintenta hasta 4 veces.
+
+    Entre múltiples coincidencias prioriza la que está visible (ver
+    _first_visible_element), para evitar clickear duplicados ocultos.
     """
     ultimo_error = None
-    
+
     for intento in range(4):
         try:
-            # Si el elemento no está listo, saltará a la excepción
-            element = _wait_for_page_ready(dv, "elemento", timeout, by, value, returnable=True)
-            
+            # Esperar a que exista al menos uno en el DOM.
+            _wait_for_page_ready(dv, "elemento", timeout, by, value,
+                                 returnable=True, silent=True)
+
+            # Elegir el elemento VISIBLE (no un duplicado oculto sin tamaño).
+            element = _first_visible_element(dv, by, value)
+            if element is None:
+                raise WebDriverException(f"Sin coincidencias para [{by}: {value}]")
+
             _click_element(dv, element, scroll, force_js)
             return # Éxito, salimos de la función inmediatamente
             

@@ -22,3 +22,9 @@ __pycache__/
 /build
 .env
 .DS_Store
+
+# --- Credenciales (NUNCA subir a git) ---
+/secrets
+firebase_key.json
+*.pem
+serviceAccountKey*.json

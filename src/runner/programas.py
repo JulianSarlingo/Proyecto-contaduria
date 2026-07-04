@@ -139,6 +139,7 @@ def _seccion_mis_retenciones(dv, estado, original_window, cuit, velocidad):
     Entra a 'Mis Retenciones', cambia de ventana, descarga y cierra la pestaña.
     """
     ret.ingresar_mis_retenciones(dv)
+    tools.pausa(velocidad)
     drv.change_window(dv, estado, original_window)
     ret.descarga_retenciones(dv, cuit, velocidad, estado)
     tn.cerrar_pestana_actual(dv)

@@ -97,9 +97,18 @@ def extraer_informacion(config):
 # Licencia
 # ---------------------------------------------------------------------------
 
+# Nombre de este programa dentro del esquema de licencias por
+# programa (ver Seguridad/firestore.py). Este repo es ARCA Downloader
+# (confirmado por el título de los diálogos de error en logger.py).
+PROGRAMA = "arca"
+
+
 def verificar_aprobacion():
     """
-    Verifica que el dispositivo tenga licencia activa para usar el programa.
+    Verifica que este equipo tenga licencia activa para PROGRAMA
+    ("arca"). La licencia ahora es por programa individual, no por
+    equipo completo: un HWID autorizado para Cronos ya no habilita
+    automáticamente ARCA Downloader, y viceversa.
 
     Flujo:
         1. Licencia autorizada  → retorna True.
@@ -107,23 +116,23 @@ def verificar_aprobacion():
         3. Sin solicitud        → crea solicitud y retorna False.
 
     Returns:
-        bool: True si el dispositivo está autorizado.
+        bool: True si el dispositivo está autorizado para PROGRAMA.
     """
     hwid = licencia.obtener_hwid()
 
-    if licencia.licencia_autorizada(hwid):
+    if licencia.licencia_autorizada(hwid, PROGRAMA):
         print("✔ Licencia autorizada. Iniciando programa...")
         return True
 
     print("❌ Licencia no autorizada.")
 
-    if licencia.solicitud_existente(hwid):
+    if licencia.solicitud_existente(hwid, PROGRAMA):
         print("⚠ Ya existe una solicitud pendiente. Espere aprobación.")
         return False
 
     print("Por favor, ingrese un nombre con el que el desarrollador pueda identificar este PC.")
     nombre = input("Ingrese un nombre: ")
-    licencia.crear_solicitud(hwid, nombre)
+    licencia.crear_solicitud(hwid, nombre, PROGRAMA)
     print("✔ Solicitud enviada. Espere la aprobación.")
     return False
 
@@ -154,8 +163,8 @@ def main():
 
     # probar_rango(config2, [3, 10], ruta, velocidad, "Comprobantes")
     # extraer_informacion(config)
-
-    ejecutar_codigo(config, ruta, velocidad, "Retenciones")
+    modo = "Retenciones"
+    ejecutar_codigo(config, ruta, velocidad, modo)
 
 
 def principal(modo_prueba):
@@ -175,5 +184,5 @@ def principal(modo_prueba):
 
 if __name__ == '__main__':
     logger.iniciar_proteccion()
-    principal(modo_prueba=True)
+    principal(modo_prueba=False)
     system('pause')

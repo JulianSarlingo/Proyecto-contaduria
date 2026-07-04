@@ -69,6 +69,19 @@ def change_window(dv, estado, original_window, timeout=10):
         for handle in dv.window_handles:
             if handle != original_window:
                 dv.switch_to.window(handle)
+
+                # Esperar a que la nueva pestaña termine de cargar antes de
+                # devolver el control. AFIP hace redirects intermedios, así que
+                # sin esto el llamador puede empezar a buscar elementos sobre una
+                # página aún en blanco o transitoria.
+                try:
+                    WebDriverWait(dv, timeout).until(
+                        lambda d: d.execute_script("return document.readyState") == "complete"
+                    )
+                except Exception:
+                    # No es fatal: el llamador tiene sus propias esperas.
+                    pass
+
                 set_estado(estado, "cambio_pestania", "OK")
                 return True
 
