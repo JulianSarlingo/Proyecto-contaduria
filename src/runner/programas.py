@@ -52,6 +52,10 @@ def login(usuario, ruta, estado, velocidad):
     ok_login = _login_afip(dv, usuario['cuit'], usuario['password'], velocidad, estado)
     if not ok_login:
         print(f"[INFO] Login falló para {usuario['nombre']}, se salta al siguiente.")
+        # Cerramos el Chrome que abrimos: si el login falla (p. ej. el usuario
+        # debe cambiar la contraseña), la instancia quedaba abierta y nadie la
+        # cerraba. cerrar_driver además lo saca del registro global.
+        drv.cerrar_driver(dv)
         raise Exception("Fallo en login: no se pudo iniciar sesión")
 
     return dv
@@ -101,7 +105,12 @@ def _seccion_comprobantes_empresa(dv, usuario, estado, velocidad):
     """Descarga comprobantes para cada empresa asociada al usuario."""
     empresas = comp.encontrar_empresas(dv)
     for i in range(len(empresas)):
-        empresas = comp.encontrar_empresas(dv)
+        # Refrescamos la lista SOLO a partir de la 2da vuelta: tras
+        # retroceder_paginas los WebElements previos quedan stale. En la 1ra
+        # vuelta la lista recién obtenida sigue siendo válida (misma página),
+        # evitando una búsqueda redundante por usuario con sociedades.
+        if i > 0:
+            empresas = comp.encontrar_empresas(dv)
         comp.seleccionar_empresa(dv, empresas[i])
         tools.pausa(velocidad)
         comp.descargar_comprobantes(dv, usuario, estado, velocidad)
@@ -192,7 +201,7 @@ def _seccion_portal_iva(dv, usuario, ruta, estado, original_window, velocidad, s
     else:
         _seccion_portal_iva_personales(dv, usuario, ruta, estado, velocidad)
 
-    dv.quit()
+    drv.cerrar_driver(dv)
 
 
 # ---------------------------------------------------------------------------
@@ -218,7 +227,7 @@ def programa_Comprobantes(usuario, ruta, estado, velocidad=1):
     tiene_sociedades = len(usuario['sociedades']) > 0
     _seccion_mis_comprobantes(dv, usuario, estado, original_window, velocidad, sociedades=tiene_sociedades)
 
-    dv.quit()
+    drv.cerrar_driver(dv)
 
 
 @logger.debug_trace
@@ -233,7 +242,7 @@ def programa_Retenciones(usuario, ruta, estado, velocidad=1):
     original_window = _pausa_y_servicios(dv, velocidad)
     _seccion_mis_retenciones(dv, estado, original_window, usuario['cuit'], velocidad)
 
-    dv.quit()
+    drv.cerrar_driver(dv)
 
 
 @logger.debug_trace

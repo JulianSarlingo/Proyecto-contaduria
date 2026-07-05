@@ -138,7 +138,7 @@ def _ruta_cache(ruta_excel: str) -> str:
 
 # ==== función orquestadora ====
 
-def procesar_config(ruta_excel, sheet_name):
+def procesar_config(ruta_excel, sheet_name, forzar=False):
     """
     Orquesta todo: lee el Excel (o el caché si está disponible),
     indexa sociedades y arma config final.
@@ -152,8 +152,10 @@ def procesar_config(ruta_excel, sheet_name):
     cache_file = _ruta_cache(ruta_excel)
     mtime      = get_file_mtime(ruta_excel)
 
-    # --- Intentar cargar desde caché ---
-    if os.path.exists(cache_file):
+    # --- Intentar cargar desde caché (salvo re-lectura forzada) ---
+    if forzar:
+        print("[Caché] Re-lectura forzada: ignorando el caché y releyendo el Excel.")
+    if not forzar and os.path.exists(cache_file):
         try:
             with open(cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)

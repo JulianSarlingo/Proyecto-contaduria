@@ -12,12 +12,15 @@ Para generar el ejecutable:
     .\\venv_nuevo\\Scripts\\auto-py-to-exe.exe
 """
 
-from logging import config
 import os
 from os import system
 
+import keyboard
+
 import tools
 import logger
+import menu
+from browser import driver as drv
 from runner.ejecutor import ejecutar_codigo, probar_usuario, probar_rango, probar_usuario_manual
 from estado_usuario import nuevo_estado, set_estado, imprimir_estado
 from Seguridad import licencia
@@ -55,7 +58,14 @@ def extraer_configuracion(nombre_archivo):
         return ruta, velocidad, sheet_name, modo
 
     except FileNotFoundError:
-        return f"Error: El archivo '{nombre_archivo}' no fue encontrado."
+        # Antes se devolvía un string acá, pero main() desempaqueta 4 valores
+        # (ruta, velocidad, sheet_name, modo) -> daba un ValueError críptico.
+        # Lanzamos un error claro que la protección global (excepthook) muestra
+        # al usuario en el messagebox de logger.
+        raise FileNotFoundError(
+            f"No se encontró el archivo de configuración '{nombre_archivo}'. "
+            f"Verificá que exista junto al programa."
+        )
 
 
 def extraer_informacion(config):
@@ -142,29 +152,21 @@ def verificar_aprobacion():
 # ---------------------------------------------------------------------------
 
 def main():
-    """Carga la configuración e inicia el procesamiento de todos los usuarios."""
+    """Carga la configuración e inicia el menú interactivo."""
     ruta, velocidad, sheet_name, modo = extraer_configuracion('config.txt')
-    ruta, config = tools.init(ruta, sheet_name)
-    
 
-    # --- Opciones de prueba (descomentar según necesidad) ---
-    # base_dir = os.path.dirname(ruta) + "\\Datos Afip"
-    # probar_usuario_manual(base_dir, velocidad, modo)
-    # probar_usuario(config, 40, ruta, velocidad, modo) #
-    #  
-    # Probar usuarios específicos para Mis comprobantes:
-    # config2 = [config[155], config[124], config[127], config[164], config[101]]
-    # probar_usuario()
-    # probar_usuario(config, 40-1, ruta, velocidad, "Comprobantes") # Dicuzzo Fernando Nicolas
-    # probar_usuario(config, 124-1, ruta, velocidad, "Comprobantes") # Vera Nilda Ignacia
-    # probar_usuario(config, 127-1, ruta, velocidad, "Comprobantes") # Viviani Clarisa
-    # probar_usuario(config, 164-1, ruta, velocidad, "Comprobantes") # Morteo Maria Ignacio
-    # probar_usuario(config, 101-1, ruta, velocidad, "Comprobantes") # Peralta Maximiliano Gaston
-
-    # probar_rango(config2, [3, 10], ruta, velocidad, "Comprobantes")
+    # --- Opciones de prueba manual (descomentar según necesidad) ---
+    # Siguen disponibles; corren un usuario/rango puntual sin pasar por el menú.
+    # base_dir, config = tools.init(ruta, sheet_name)
+    # probar_usuario_manual(base_dir, velocidad, "Comprobantes")
+    # probar_usuario(config, 40, base_dir, velocidad, "Comprobantes")   # Dicuzzo Fernando Nicolas
+    # probar_usuario(config, 124, base_dir, velocidad, "Comprobantes")  # Vera Nilda Ignacia
+    # probar_usuario(config, 127, base_dir, velocidad, "Comprobantes")  # Viviani Clarisa
+    # probar_rango(config, [3, 10], base_dir, velocidad, "Comprobantes")
     # extraer_informacion(config)
-    modo = "Retenciones"
-    ejecutar_codigo(config, ruta, velocidad, modo)
+
+    # Menú: 1) Ejecutar  2) Actualizar Excel  3) Chequear actualizaciones
+    menu.iniciar(ruta, velocidad, sheet_name)
 
 
 def principal(modo_prueba):
@@ -182,7 +184,26 @@ def principal(modo_prueba):
 # Entry point
 # ---------------------------------------------------------------------------
 
+def _configurar_tecla_panico(combinacion="ctrl+shift+q"):
+    """
+    Registra una tecla de pánico GLOBAL: al presionarla (desde cualquier
+    ventana) cierra todos los Chrome abiertos y mata el programa al instante.
+    """
+    def _panico():
+        print("\n[PÁNICO] Cerrando todos los Chrome y terminando el programa...")
+        drv.cerrar_todos_los_chrome()
+        os._exit(1)  # corte inmediato: no esperamos a los hilos
+
+    try:
+        keyboard.add_hotkey(combinacion, _panico)
+        print(f"[INFO] Tecla de pánico activa: '{combinacion.upper()}' "
+              f"cierra todo y mata el programa.")
+    except Exception as e:
+        print(f"[WARN] No se pudo activar la tecla de pánico ({e}).")
+
+
 if __name__ == '__main__':
     logger.iniciar_proteccion()
+    _configurar_tecla_panico()
     principal(modo_prueba=False)
     system('pause')

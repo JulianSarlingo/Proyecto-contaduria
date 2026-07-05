@@ -113,7 +113,7 @@ def iniciar_proteccion():
 # ==========================================
 import functools
 
-DEBUG_MODE = True  # Variable global para activar/desactivar el modo debug
+DEBUG_MODE = False  # Debug desactivado en producción; poner en True para diagnosticar.
 
 def debug_trace(func):
     """

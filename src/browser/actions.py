@@ -262,7 +262,7 @@ def _click_element_by(dv, by, value, timeout=10, scroll=True, force_js=True):
             # Si el XPath/CSS está mal redactado, rompemos el bucle porque nunca va a funcionar
             raise e
             
-        except (WebDriverException, Exception) as e:
+        except Exception as e:
             ultimo_error = e
             # Bajamos el tiempo de espera en el reintento si es un fallo de click/interacción
             time.sleep(0.5) 
@@ -327,21 +327,21 @@ def buscar_botones_descargables(dv, textos=["Excel", "CSV"], timeout=10):
     return botones_validos
 
 
-def _click_span_descarga(dv, formatos=["Excel", "CSV"], type="Comprobantes"):
+def _click_span_descarga(dv, formatos=["Excel", "CSV"], tipo="Comprobantes"):
     """
     Hace clic en los botones de descarga según el tipo de sección.
 
     Args:
         dv: WebDriver.
         formatos (list): Formatos a descargar ['Excel', 'CSV'].
-        type (str): 'Comprobantes', 'Portal' o 'Retenciones'.
+        tipo (str): 'Comprobantes', 'Portal' o 'Retenciones'.
 
     Returns:
         dict: Resultado por formato {"Excel": "OK"/"ERROR", "CSV": "OK"/"ERROR"}.
     """
     wait_until_page_loaded(dv)
 
-    if type in ["Comprobantes", "Portal"]:
+    if tipo in ["Comprobantes", "Portal"]:
         resultados = {f: None for f in formatos}
         for texto in formatos:
             try:
@@ -353,7 +353,7 @@ def _click_span_descarga(dv, formatos=["Excel", "CSV"], type="Comprobantes"):
                 resultados[texto] = "ERROR"
         return resultados
 
-    elif type == "Retenciones":
+    elif tipo == "Retenciones":
         try:
             selector = "a[href*='consultaMisRetenciones.do?method=exportExcel']"
             _click_element_by(dv, By.CSS_SELECTOR, selector, 4)

@@ -102,7 +102,7 @@ def descarga_retenciones(dv, cuit, velocidad=1, estado=None):
 
         # Con datos → descargar
         try:
-            act._click_span_descarga(dv, type="Retenciones")
+            act._click_span_descarga(dv, tipo="Retenciones")
             if estado is not None:
                 set_estado(estado, f"retenciones_{impuesto}", "OK")
         except Exception as e:

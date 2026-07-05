@@ -18,13 +18,14 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.print_page_options import PrintOptions
 
 import config_loader as cl
+import logger
 
 
 # ---------------------------------------------------------------------------
 # Inicialización
 # ---------------------------------------------------------------------------
 
-def init(ruta_base, sheet_name):
+def init(ruta_base, sheet_name, forzar=False):
     """
     Inicializa el sistema: carga la configuración del Excel y crea
     la carpeta de destino de descargas si no existe.
@@ -32,13 +33,14 @@ def init(ruta_base, sheet_name):
     Args:
         ruta_base (str): Ruta completa al archivo Excel de configuración.
         sheet_name (str): Nombre de la hoja a leer en el Excel.
+        forzar (bool): Si True, ignora el caché y re-lee el Excel.
 
     Returns:
         tuple: (base_dir, config)
             base_dir (str): Ruta de la carpeta 'Datos Afip'.
             config (list): Lista de dicts con los datos de cada usuario.
     """
-    config   = cl.procesar_config(ruta_base, sheet_name)
+    config   = cl.procesar_config(ruta_base, sheet_name, forzar=forzar)
     base_dir = os.path.dirname(ruta_base) + "\\Datos Afip"
     os.makedirs(base_dir, exist_ok=True)
     return base_dir, config
@@ -164,12 +166,15 @@ def _encontrar_todos_elementos(dv, xpath, timeout=10):
             EC.presence_of_element_located((By.XPATH, xpath))
         )
         elementos = dv.find_elements(By.XPATH, xpath)
-        for i, el in enumerate(elementos):
-            try:
-                print(f"[DEBUG]   Elemento {i+1}: Tag '{el.tag_name}', "
-                      f"Texto: '{el.text}', class='{el.get_attribute('class')}'")
-            except Exception as e:
-                print(f"[DEBUG]   No se pudo leer el elemento {i+1}: {e}")
+        # Introspección (tag/text/class) SOLO en debug: cada acceso es un
+        # round-trip a Chrome; en producción penalizaba por cada elemento.
+        if logger.DEBUG_MODE:
+            for i, el in enumerate(elementos):
+                try:
+                    print(f"[DEBUG]   Elemento {i+1}: Tag '{el.tag_name}', "
+                          f"Texto: '{el.text}', class='{el.get_attribute('class')}'")
+                except Exception as e:
+                    print(f"[DEBUG]   No se pudo leer el elemento {i+1}: {e}")
         return elementos
 
     except TimeoutException:
