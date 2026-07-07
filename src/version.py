@@ -11,17 +11,18 @@ que actualizar.
 # Identificador del programa (mismo esquema que la licencia por programa).
 PROGRAM_ID = "arca"
 
-# Versión de este build.
-VERSION = "2.2.5"
+# Versión de este build. Subila antes de compilar cada release.
+VERSION = "2.3.0"
 
-# URL del manifiesto de actualizaciones (JSON) para este programa.
-# Completá con la URL pública de tu archivo en Firebase Storage.
+# URL del manifiesto de actualizaciones (JSON) en GitHub Releases.
+# Es ESTABLE: siempre el tag 'latest' con el archivo manifest.json. En cada
+# release actualizás el CONTENIDO del manifest (no esta URL).
 #
-# Formato esperado del JSON:
+# Formato del manifest.json (lo genera release/generar_manifest.py):
 #   {
-#       "version":   "2.2.6",
-#       "url":       "https://.../arca_2.2.6.exe",
+#       "version":   "2.3.1",
+#       "url":       "https://github.com/JulianSarlingo/arca-releases/releases/download/v2.3.1/arca.exe",
 #       "sha256":    "<hash sha-256 del exe>",
 #       "changelog": "Qué cambió"
 #   }
-URL_MANIFIESTO = ""  # <-- COMPLETAR con tu URL de Firebase Storage
+URL_MANIFIESTO = "https://github.com/JulianSarlingo/arca-releases/releases/download/latest/manifest.json"

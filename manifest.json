@@ -1,0 +1,6 @@
+{
+  "version": "2.3.0",
+  "url": "https://github.com/JulianSarlingo/Proyecto-contaduria/releases/download/v2.3.0/arca.exe",
+  "sha256": "5302bcfe3762d764288478ff07e4fc75df726ebe9f4d3bbbee0c711c1871bcfa",
+  "changelog": "Ejecucion en paralelo, menu, aborto de Chrome y auto-update"
+}

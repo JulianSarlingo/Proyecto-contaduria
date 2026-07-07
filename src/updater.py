@@ -1,207 +1,192 @@
 """
-updater.py
-----------
-Módulo de actualización remota, autocontenido y REUTILIZABLE: no importa nada de
-este proyecto, así que se puede copiar tal cual a cualquier programa (ARCA,
-Cronos, etc.). Solo usa la librería estándar de Python.
+updater.py — Módulo autocontenido de auto-actualización para ejecutables Windows.
 
-Flujo de check_for_updates():
-  1. Lee un manifiesto JSON remoto (por URL) con la última versión disponible.
-  2. Lo compara contra la versión local.
-  3. Si hay una más nueva, pide confirmación, descarga el nuevo .exe y verifica
-     su hash SHA-256.
-  4. Aplica el reemplazo en Windows: un .exe en ejecución no puede sobrescribirse
-     a sí mismo, así que se escribe un .bat que espera a que el programa cierre,
-     reemplaza el viejo por el nuevo y relanza; luego se lanza ese .bat y se
-     cierra el programa.
+Diseñado para ser copiado tal cual a cualquier proyecto.
+NO importa nada del proyecto ni de librerías externas (solo stdlib).
 
-Pensado para un ejecutable empaquetado (PyInstaller / auto-py-to-exe, one-file).
-En modo desarrollo (corriendo como .py) detecta que no hay .exe y no hace el
-reemplazo.
+Uso:
+    from updater import check_for_updates
+    check_for_updates("mi_programa", "1.0.0", "https://...manifest.json")
 
-Formato esperado del manifiesto (JSON):
+El manifiesto remoto debe ser un JSON con esta estructura:
     {
-        "version":   "2.2.6",
-        "url":       "https://.../arca_2.2.6.exe",
-        "sha256":    "<hash sha-256 del exe, en hex>",
-        "changelog": "Qué cambió en esta versión"
+        "version": "1.2.0",
+        "url": "https://...nuevo.exe",
+        "sha256": "abcdef1234...",
+        "changelog": "Descripción de cambios"
     }
 """
 
+import hashlib
+import json
 import os
 import sys
-import json
-import hashlib
 import tempfile
-import subprocess
+import textwrap
+import urllib.error
 import urllib.request
 
 
-# ---------------------------------------------------------------------------
-# Manifiesto y comparación de versiones
-# ---------------------------------------------------------------------------
-
-def _leer_manifiesto(url, timeout=15):
-    """Descarga y parsea el manifiesto JSON remoto. Devuelve dict o None."""
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as r:
-            return json.loads(r.read().decode("utf-8"))
-    except Exception as e:
-        print(f"[Update] No se pudo leer el manifiesto: {e}")
-        return None
-
-
-def _a_tupla(v):
-    """'2.2.10' -> (2, 2, 10). Ignora lo no numérico para poder comparar."""
-    partes = []
-    for x in str(v).strip().split("."):
-        num = "".join(ch for ch in x if ch.isdigit())
-        partes.append(int(num) if num else 0)
-    return tuple(partes)
+def _comparar_versiones(v1: str, v2: str) -> int:
+    partes1 = [int(x) for x in v1.strip().split(".")]
+    partes2 = [int(x) for x in v2.strip().split(".")]
+    largo = max(len(partes1), len(partes2))
+    partes1.extend([0] * (largo - len(partes1)))
+    partes2.extend([0] * (largo - len(partes2)))
+    for a, b in zip(partes1, partes2):
+        if a < b:
+            return -1
+        if a > b:
+            return 1
+    return 0
 
 
-def _hay_version_nueva(actual, remota):
-    """True si 'remota' es estrictamente mayor que 'actual'."""
-    return _a_tupla(remota) > _a_tupla(actual)
+def _descargar_json(url: str) -> dict:
+    req = urllib.request.Request(url, headers={"User-Agent": "AutoUpdater/1.0"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
-# ---------------------------------------------------------------------------
-# Descarga y verificación
-# ---------------------------------------------------------------------------
+def _descargar_archivo(url: str, destino: str) -> None:
+    req = urllib.request.Request(url, headers={"User-Agent": "AutoUpdater/1.0"})
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        total = resp.headers.get("Content-Length")
+        total = int(total) if total else None
+        descargado = 0
+        bloque = 64 * 1024
+        with open(destino, "wb") as f:
+            while True:
+                datos = resp.read(bloque)
+                if not datos:
+                    break
+                f.write(datos)
+                descargado += len(datos)
+                if total:
+                    pct = descargado * 100 // total
+                    mb = descargado / (1024 * 1024)
+                    total_mb = total / (1024 * 1024)
+                    print(f"\r  Descargando: {mb:.1f} / {total_mb:.1f} MB ({pct}%)", end="", flush=True)
+                else:
+                    mb = descargado / (1024 * 1024)
+                    print(f"\r  Descargando: {mb:.1f} MB", end="", flush=True)
+    print()
 
-def _descargar(url, destino, timeout=60):
-    """Descarga 'url' a 'destino'. Devuelve True si salió bien."""
-    try:
-        print("[Update] Descargando la nueva versión...")
-        with urllib.request.urlopen(url, timeout=timeout) as r, open(destino, "wb") as f:
-            f.write(r.read())
-        return True
-    except Exception as e:
-        print(f"[Update] Falló la descarga: {e}")
-        return False
 
-
-def _sha256(archivo):
-    """Devuelve el SHA-256 (hex) de un archivo, leyéndolo por bloques."""
+def _verificar_sha256(ruta: str, hash_esperado: str) -> bool:
     h = hashlib.sha256()
-    with open(archivo, "rb") as f:
-        for bloque in iter(lambda: f.read(8192), b""):
+    with open(ruta, "rb") as f:
+        while True:
+            bloque = f.read(64 * 1024)
+            if not bloque:
+                break
             h.update(bloque)
-    return h.hexdigest()
+    return h.hexdigest().lower() == hash_esperado.lower()
 
 
-# ---------------------------------------------------------------------------
-# Aplicación de la actualización (Windows, .exe one-file)
-# ---------------------------------------------------------------------------
-
-def _aplicar_actualizacion_windows(nuevo_exe):
-    """
-    Reemplaza el .exe actual por 'nuevo_exe' y relanza, mediante un .bat que
-    espera a que este proceso cierre. Cierra el programa al final (os._exit),
-    para que el ejecutable quede libre y se pueda sobrescribir.
-    """
-    exe_actual = sys.executable
-    exe_nombre = os.path.basename(exe_actual)
-    bat = os.path.join(tempfile.gettempdir(),
-                       os.path.splitext(exe_nombre)[0] + "_update.bat")
-
-    # El .bat: espera a que el proceso desaparezca, reemplaza el exe, relanza y
-    # se borra a sí mismo.
-    contenido = (
-        "@echo off\r\n"
-        f"echo Actualizando {exe_nombre}, no cierres esta ventana...\r\n"
-        ":esperar\r\n"
-        f'tasklist /fi "imagename eq {exe_nombre}" 2>nul | find /i "{exe_nombre}" >nul\r\n'
-        "if not errorlevel 1 (\r\n"
-        "    timeout /t 1 /nobreak >nul\r\n"
-        "    goto esperar\r\n"
-        ")\r\n"
-        f'move /y "{nuevo_exe}" "{exe_actual}" >nul\r\n'
-        f'start "" "{exe_actual}"\r\n'
-        'del "%~f0"\r\n'
-    )
-    with open(bat, "w", encoding="utf-8") as f:
-        f.write(contenido)
-
-    print("[Update] Cerrando el programa para aplicar la actualización...")
-    subprocess.Popen(["cmd", "/c", bat],
-                     creationflags=subprocess.CREATE_NEW_CONSOLE,
-                     close_fds=True)
-    os._exit(0)
+def _crear_bat_reemplazo(exe_actual: str, exe_nuevo: str, nombre_imagen: str) -> str:
+    bat_contenido = textwrap.dedent(f"""\
+        @echo off
+        echo Aplicando actualizacion, no cierres esta ventana...
+        :esperar
+        tasklist /FI "IMAGENAME eq {nombre_imagen}" 2>NUL | find /I "{nombre_imagen}" >NUL
+        if not errorlevel 1 (
+            timeout /t 1 /nobreak >NUL
+            goto esperar
+        )
+        echo Reemplazando ejecutable...
+        move /y "{exe_nuevo}" "{exe_actual}"
+        if errorlevel 1 (
+            echo ERROR: No se pudo reemplazar el ejecutable.
+            pause
+            exit /b 1
+        )
+        echo Relanzando programa...
+        start "" "{exe_actual}"
+        echo Listo. Esta ventana se cerrara sola.
+        (goto) 2>nul & del "%~f0"
+    """)
+    directorio = os.path.dirname(exe_actual) or "."
+    bat_path = os.path.join(directorio, "_updater_temp.bat")
+    with open(bat_path, "w", encoding="utf-8") as f:
+        f.write(bat_contenido)
+    return bat_path
 
 
-# ---------------------------------------------------------------------------
-# API pública
-# ---------------------------------------------------------------------------
-
-def check_for_updates(program_id, version_actual, url_manifiesto):
-    """
-    Chequea si hay una versión más nueva y, si el usuario acepta, la instala.
-
-    Args:
-        program_id (str): Identificador del programa (ej. 'arca').
-        version_actual (str): Versión de este build (ej. '2.2.5').
-        url_manifiesto (str): URL del manifiesto JSON con la última versión.
-    """
+def check_for_updates(program_id: str, version_actual: str, url_manifiesto: str) -> None:
     if not url_manifiesto:
-        print("[Update] No hay URL de manifiesto configurada (ver version.py).")
+        print("[Updater] URL del manifiesto no configurada.")
         return
 
-    print(f"[Update] Buscando actualizaciones de '{program_id}' "
-          f"(versión actual {version_actual})...")
+    frozen = getattr(sys, "frozen", False)
+    if not frozen:
+        print("[Updater] Modo desarrollo detectado (.py, no .exe).")
+        print("          El chequeo se ejecutará, pero no se aplicará el reemplazo.")
 
-    manifiesto = _leer_manifiesto(url_manifiesto)
-    if not manifiesto:
+    print(f"\n[Updater] Consultando actualizaciones para '{program_id}'...")
+    try:
+        manifiesto = _descargar_json(url_manifiesto)
+    except urllib.error.URLError as e:
+        print(f"[Updater] Error de red al descargar el manifiesto: {e}")
+        return
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"[Updater] El manifiesto no es un JSON válido: {e}")
+        return
+    except Exception as e:
+        print(f"[Updater] Error inesperado: {e}")
         return
 
-    version_remota = manifiesto.get("version", "")
-    url_exe        = manifiesto.get("url", "")
-    hash_esperado  = manifiesto.get("sha256", "")
-    changelog      = manifiesto.get("changelog", "")
-
-    if not _hay_version_nueva(version_actual, version_remota):
-        print(f"[Update] Ya tenés la última versión ({version_actual}).")
-        return
-
-    print(f"\n[Update] Hay una nueva versión disponible: {version_remota} "
-          f"(tenés la {version_actual}).")
-    if changelog:
-        print(f"[Update] Novedades: {changelog}")
-
-    # Si no corremos como .exe empaquetado, no hay reemplazo posible.
-    if not getattr(sys, "frozen", False):
-        print("[Update] Estás en modo desarrollo (no .exe): no se aplica el "
-              "reemplazo automático. Actualizá el código manualmente.")
-        return
-
-    if not url_exe:
-        print("[Update] El manifiesto no trae la URL del ejecutable.")
-        return
-
-    respuesta = input("¿Descargar e instalar ahora? (s/n): ").strip().lower()
-    if respuesta not in ("s", "si", "sí", "y", "yes"):
-        print("[Update] Actualización pospuesta.")
-        return
-
-    destino = os.path.join(tempfile.gettempdir(),
-                           f"{program_id}_{version_remota}.exe")
-    if not _descargar(url_exe, destino):
-        return
-
-    # Verificación de integridad: clave porque estamos bajando un ejecutable.
-    if hash_esperado:
-        real = _sha256(destino)
-        if real.lower() != hash_esperado.lower():
-            print("[Update] ¡El hash NO coincide! Descarga corrupta o alterada. "
-                  "Se cancela por seguridad.")
-            try:
-                os.remove(destino)
-            except OSError:
-                pass
+    for campo in ("version", "url", "sha256"):
+        if campo not in manifiesto:
+            print(f"[Updater] Manifiesto incompleto: falta el campo '{campo}'.")
             return
-        print("[Update] Hash SHA-256 verificado OK.")
-    else:
-        print("[Update] (Aviso: el manifiesto no trae 'sha256'; no se pudo "
-              "verificar la integridad del archivo descargado.)")
 
-    _aplicar_actualizacion_windows(destino)
+    version_remota = manifiesto["version"]
+    url_exe = manifiesto["url"]
+    hash_esperado = manifiesto["sha256"]
+    changelog = manifiesto.get("changelog", "(sin descripción de cambios)")
+
+    cmp = _comparar_versiones(version_actual, version_remota)
+    if cmp >= 0:
+        print(f"[Updater] Ya tenés la versión más reciente ({version_actual}).")
+        return
+
+    print(f"\n  Nueva versión disponible: {version_remota} (actual: {version_actual})")
+    print(f"  Cambios: {changelog}\n")
+
+    resp = input("  ¿Descargar e instalar? (s/n): ").strip().lower()
+    if resp != "s":
+        print("[Updater] Actualización cancelada.")
+        return
+
+    try:
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".exe", prefix="update_")
+        os.close(tmp_fd)
+        _descargar_archivo(url_exe, tmp_path)
+    except Exception as e:
+        print(f"[Updater] Error al descargar el nuevo ejecutable: {e}")
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        return
+
+    print("  Verificando integridad (SHA-256)...")
+    if not _verificar_sha256(tmp_path, hash_esperado):
+        print("[Updater] ERROR: El hash no coincide. Descarga corrupta o manipulada.")
+        os.remove(tmp_path)
+        return
+    print("  Hash OK.")
+
+    if not frozen:
+        print("\n[Updater] Modo desarrollo: la descarga y verificación funcionaron,")
+        print("          pero no se reemplaza nada (no estás corriendo un .exe).")
+        os.remove(tmp_path)
+        return
+
+    exe_actual = sys.executable
+    nombre_imagen = os.path.basename(exe_actual)
+
+    print("  Preparando reemplazo...")
+    bat_path = _crear_bat_reemplazo(exe_actual, tmp_path, nombre_imagen)
+
+    os.startfile(bat_path)
+    print("  Cerrando para aplicar la actualización...")
+    os._exit(0)
